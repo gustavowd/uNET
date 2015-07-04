@@ -13,13 +13,13 @@
 #define ROUTER_AUTO_ASSOCIATION				FALSE
 
 // Network device type: see options above
-#define   DEVICE_TYPE                       PAN_COORDINATOR
+#define   DEVICE_TYPE                       ROUTER
 
 // Define router type
 #define   ROUTER1                   		0
 #define   ROUTER2                           1
 
-#define   ROUTER_TYPE                       ROUTER1
+#define   ROUTER_TYPE                       ROUTER2
 
 // CPU memory alignment
 #define CPU_32_BITS                         1
@@ -59,6 +59,9 @@
 #define PING_TIME		 10
 #define MAX_PING_TIME	  8
 #define PING_RETRIES	  3
+
+// UpRoute Times
+#define MAX_UPROUTE_MAINTENANCE_TIME	30
 
 /// RF Buffer Size
 #define RFBufferSize      (INT16U)768      // max. 6 packets (128B)

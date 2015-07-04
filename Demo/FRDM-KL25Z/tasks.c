@@ -113,6 +113,7 @@ void pisca_led_net(void *param)
 #endif
 
 #if (ROUTER_TYPE == ROUTER2)
+#if 0
 void make_path(void *param)
 {
 	(void)param;
@@ -123,6 +124,7 @@ void make_path(void *param)
 		DelayTask(5000);
 	}
 }
+#endif
 #endif
 #endif
 

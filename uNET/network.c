@@ -74,9 +74,13 @@ BRTOS_Mutex                  *Radio_IEEE802;
 #endif
 
 static   INT16U              DepthWatchdog        = 0;
-volatile INT16U              NeighborPingTimeV    = 10000;
 volatile INT16U              RadioWatchdog        = 5000;
 volatile INT8U               NeighborPingTimeCnt  = 1;
+
+#if (USE_REACTIVE_UP_ROUTE == 1)
+volatile INT8U				 ReactiveUpTimeCnt    = 1;
+volatile INT16U 			 ReactiveUpCnt        = 0;
+#endif
 
 volatile NWK_TASKS_PENDING   nwk_tasks_pending;
 
@@ -322,6 +326,36 @@ void VerifyNeighbourhood(void)
       NeighborTable = 0;
 }
 
+#if (USE_REACTIVE_UP_ROUTE == 1)
+void VerifyUpRouteTable(void)
+{
+      INT8U i = 0;
+
+      // Verifica se existem nós inativos
+      for(i=0;i<ROUTING_UP_TABLE_SIZE;i++)
+      {
+        // Se o nó está inativo por um determinado tempo
+        if (unet_routing_up_table[i].activity == FALSE)
+        {
+          // Retira da tabela de rotas up
+          if (unet_routing_up_table[i].DestinyAddr != 0xFFFE)
+          {
+            // Delete node information
+        	unet_routing_up_table[i].DestinyAddr   = 0xFFFE;
+        	unet_routing_up_table[i].Addr_16b      = 0xFFFE;
+        	unet_routing_up_table[i].Destination   = FALSE;
+        	unet_routing_up_table[i].hops		   = 0;
+          }
+        }
+      }
+
+      // Clear table to refresh nodes activity
+      for(i=0;i<ROUTING_UP_TABLE_SIZE;i++)
+      {
+    	  unet_routing_up_table[i].activity = FALSE;
+      }
+}
+#endif
 
 
 void IncDepthWatchdog(void) 
@@ -688,6 +722,7 @@ INT8U HandleRoutePacket(void)
 				  // Copia o endereço do nó de origem do pacote para a lista de rotas up disponíveis
 				  unet_routing_up_table[i].DestinyAddr = nwk_packet.NWK_Source;
 				  unet_routing_up_table[i].hops 	   = nwk_packet.NWK_Packet_Life + 1;
+				  unet_routing_up_table[i].activity	   = TRUE;
 
 				}
         	}
@@ -883,6 +918,12 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
   if (thisNodeDepth >= ROUTE_TO_BASESTATION_LOST){
       return NO_ROUTE_AVAILABLE;
   }
+
+  // Se está enviando uma mensagem no sentido do coordenador
+  // não precisa de mensagem de manutenção de rota up
+  UserEnterCritical();
+  ReactiveUpCnt = 0;
+  UserExitCritical();
 
   // Encontra a menor profundidade na tabela de vizinhos
   TryAnotherNodeDown:
@@ -1406,8 +1447,20 @@ INT8U OneHopRoute(INT8U NWKPayloadSize, INT16U destiny){
   
 }
 
+#if (USE_REACTIVE_UP_ROUTE == 1)
+INT8U ReactiveUpMessage(void)
+{
+  INT8U j = 0;
+  INT8U status = 0;
 
+  // Não executa nada na camada de aplicação
+  NWKPayload[j++] = 0xFF;
 
+  status = DownRoute(START_ROUTE,(INT8U)(j));
+
+  return status;
+}
+#endif
 
 
 

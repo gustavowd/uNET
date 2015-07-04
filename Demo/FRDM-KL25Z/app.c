@@ -85,6 +85,7 @@ INT8U NetGeneralONOFF(INT8U state, INT16U destiny)
 
 
 
+#if 0
 INT8U NetGeneralCreateUpPath(void)
 {
   INT8U j = 0;
@@ -102,6 +103,7 @@ INT8U NetGeneralCreateUpPath(void)
 
   return status;
 }
+#endif
 
 
 

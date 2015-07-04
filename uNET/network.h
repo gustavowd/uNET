@@ -87,6 +87,18 @@ typedef INT16U                  NEIGHBOR_TABLE_T;
 // Set RX buffer control
 #define AUTO_ACK_CONTROL        0
 
+// Neighbor Ping Time in msec
+#define NEIGHBOR_PING_TIME   (INT16U)(1000)
+
+// Neighbourhood Timeout in msec
+#define NEIGHBOURHOOD_TIMEOUT (INT32U)(NEIGHBOR_PING_TIME*MAX_PING_TIME*3)
+
+// Reactive maintenance packet Time in msec
+#define REACTIVE_UP_MESSAGE_TIME   (INT16U)(5000)
+
+// Reactive table maintenance timeout in msec
+#define REACTIVE_UP_TIMEOUT (INT32U)(REACTIVE_UP_MESSAGE_TIME*MAX_UPROUTE_MAINTENANCE_TIME*2)
+
 // Depth Watchdog Timeout in msec
 #define DEPTH_TIMEOUT           (INT16U)20000
 
@@ -103,8 +115,8 @@ typedef union _NWK_TASKS_PENDING
         INT8U NewNeighborPing             :1;
         INT8U RadioReset                  :1;
         INT8U RoutePending                :1;
-        INT8U NewAddressArrived           :1;
-        INT8U BroadcastPending            :1;
+        INT8U ReactiveUpMessagePending    :1;
+        INT8U VerifyReactiveUpTable       :1;
         INT8U RetryBroadcast			  :1;
     } bits;
 } NWK_TASKS_PENDING;
@@ -161,6 +173,7 @@ typedef struct _UNET_ROUTING_UP_TABLE
     INT16U		  DestinyAddr;				  // 16 bit address of the destination node
     INT8U         Destination;				  // informs one hop distance to the destination node
     INT8U		  hops;						  // Distance in hops to the destination node
+    INT8U		  activity;					  // node activity in the last minutes
 } UNET_ROUTING_UP_TABLE;
 
 
@@ -192,6 +205,12 @@ INT8U UpSimpleRoute(INT8U NWKPayloadSize);
 INT8U UpBroadcastRoute(INT8U NWKPayloadSize);
 INT8U OneHopRoute(INT8U NWKPayloadSize, INT16U destiny);
 
+#if (USE_REACTIVE_UP_ROUTE == 1)
+INT8U ReactiveUpMessage(void);
+INT8U ReactiveUpRoute(INT8U RouteInit, INT8U NWKPayloadSize, INT16U destiny);
+void VerifyUpRouteTable(void);
+#endif
+
 /* UNET API */
 #if 0
 INT8U UNET_TX_toBase(INT8U *ptr_data, INT8U nbr_bytes);
@@ -200,10 +219,6 @@ INT8U UNET_TX_toChildren(INT8U *ptr_data, INT8U nbr_bytes);
 INT8U UNET_TX_toAddress(INT8U *ptr_data, INT8U nbr_bytes, POSITION* address);
 #endif
 
-
-#if (USE_REACTIVE_UP_ROUTE == 1)
-INT8U ReactiveUpRoute(INT8U RouteInit, INT8U NWKPayloadSize, INT16U destiny);
-#endif
 
 
 
@@ -238,8 +253,13 @@ extern  volatile INT16U				 ParentNeighborID;
 extern  volatile INT16U				 ParentRSSI;
 
 extern  volatile INT16U              RadioWatchdog;
-extern  volatile INT16U              NeighborPingTimeV;
 extern  volatile INT8U               NeighborPingTimeCnt;
+
+#if (USE_REACTIVE_UP_ROUTE == 1)
+extern  volatile INT16U 			 ReactiveUpCnt;
+extern  volatile INT8U				 ReactiveUpTimeCnt;
+#endif
+
 extern  volatile NWK_TASKS_PENDING   nwk_tasks_pending;
 
 

@@ -80,12 +80,6 @@ que retira os dados extras da camada app (payload da app)
 // Max. app payload size
 #define MAX_APP_PAYLOAD_SIZE    (INT8U)(MAX_PHY_PACKETSIZE-MIN_MAC_HEADER_SIZE-NWK_APP_HEADER_SIZE - 3)
 
-// Neighbor Ping Time in msec
-#define NEIGHBOR_PING_TIME   (INT16U)(1000)
-
-// Neighbourhood Timeout in msec
-#define NeighbourhoodTimeout (INT32U)(14000*2)
-
 // Radio Watchdog Timeout in msec
 #define RadioWatchdogTimeout (INT16U)15000  
 

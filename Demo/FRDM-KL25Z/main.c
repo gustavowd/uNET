@@ -77,12 +77,14 @@ int main(void)
 #endif
 
 #if (ROUTER_TYPE == ROUTER2)
+#if 0
 	  if(InstallTask(&make_path,"Make up path",512,APP2_Priority, NULL, &TH_NET_APP2) != OK)
 	  {
 	    // Oh Oh
 	    // Não deveria entrar aqui !!!
 	    while(1){};
 	  };
+#endif
 #endif
 #endif
 

@@ -210,11 +210,18 @@ void UNET_Init(void)
 
 }
 
-static INT16U StatTimer             = 0;
-static INT16U AssociateTimeout      = 0;
-static INT16U NeighborCnt           = 0;
-static INT32U NeighbourhoodCnt      = 0;
+static INT16U   StatTimer             = 0;
+static INT16U   AssociateTimeout      = 0;
+static INT16U   NeighborCnt           = 0;
+volatile INT16U NeighborPingTimeV     = 60000;
+static INT32U   NeighbourhoodCnt      = 0;
 volatile INT16U ping_retries = 0;
+
+#if (USE_REACTIVE_UP_ROUTE == 1)
+static INT32U ReactiveUpTimeV         = 60000;
+static INT32U ReactiveUpTableCnt      = 0;
+#endif
+
 volatile INT16U debug_tx_count1 = 0;
 volatile INT16U debug_tx_count2 = 0;
 volatile INT16U debug_tx_count3 = 0;
@@ -270,7 +277,7 @@ void BRTOS_TimerHook(void)
         
         // Timeout para analisar a tabela de vizinhança
         NeighbourhoodCnt++; 
-        if (NeighbourhoodCnt >= NeighbourhoodTimeout)
+        if (NeighbourhoodCnt >= NEIGHBOURHOOD_TIMEOUT)
         {
             NeighbourhoodCnt = 0;
 
@@ -279,7 +286,43 @@ void BRTOS_TimerHook(void)
             
             // Acorda a tarefa de rede
             OSSemPost(MAC_Event);
-        }        
+        }
+
+		#if (USE_REACTIVE_UP_ROUTE == 1)
+    	// Contador que define o momento para transmitir o ping da vizinhança
+        ReactiveUpCnt++;
+        if (ReactiveUpCnt >= ReactiveUpTimeV)
+        {
+        	ReactiveUpCnt = 0;
+            if (ReactiveUpTimeCnt < MAX_UPROUTE_MAINTENANCE_TIME)
+            {
+            	ReactiveUpTimeCnt++;
+            }
+            ReactiveUpTimeV = (REACTIVE_UP_MESSAGE_TIME * ReactiveUpTimeCnt) + RadioRand();
+
+            if (mac_tasks_pending.bits.AssociationInProgress != 1)
+            {
+				// Avisa que há mensagem de manutenção de rede up pendente
+				nwk_tasks_pending.bits.ReactiveUpMessagePending = 1;
+
+				// Acorda a tarefa de rede
+				OSSemPost(MAC_Event);
+            }
+        }
+
+        // Timeout para analisar a tabela de vizinhança
+        ReactiveUpTableCnt++;
+        if (ReactiveUpTableCnt >= REACTIVE_UP_TIMEOUT)
+        {
+        	ReactiveUpTableCnt = 0;
+
+            // Avisa que deve verificar a tabela de vizinhança
+            nwk_tasks_pending.bits.VerifyReactiveUpTable = 1;
+
+            // Acorda a tarefa de rede
+            OSSemPost(MAC_Event);
+        }
+		#endif
         
     }
 
@@ -393,6 +436,10 @@ void UNET_NWK(void *param)
    
    NeighborPingTimeV = NEIGHBOR_PING_TIME + RadioRand() * 75;
    
+#if (USE_REACTIVE_UP_ROUTE == 1)
+   ReactiveUpTimeV = REACTIVE_UP_MESSAGE_TIME + RadioRand() * 75;
+#endif
+
    for(i=0;i<BeaconLimit;i++)
    {
        unet_beacon[i].Addr_16b = 0xFFFE;
@@ -474,9 +521,10 @@ void UNET_NWK(void *param)
    for(i=0;i<ROUTING_UP_TABLE_SIZE;i++)
    {
 		unet_routing_up_table[i].Addr_16b            = 0xFFFE;
-		unet_routing_up_table[i].DestinyAddr		   = 0xFFFE;
+		unet_routing_up_table[i].DestinyAddr		 = 0xFFFE;
 		unet_routing_up_table[i].Destination         = FALSE;
-		unet_routing_up_table[i].hops				   = 0;
+		unet_routing_up_table[i].hops				 = 0;
+		unet_routing_up_table[i].activity			 = FALSE;
    }
 #endif
 
@@ -534,27 +582,6 @@ void UNET_NWK(void *param)
   			  UserExitCritical();
   		}
            
-      
-      #if(DEVICE_TYPE != PAN_COORDINATOR)
-  		  // Verifica novo endereço de posição
-  		  UserEnterCritical();
-  		  if (nwk_tasks_pending.bits.NewAddressArrived == 1)       // set in UNET_MAC
-  		  {
-  			  UserExitCritical();
-  			  
-  			  VerifyNewAddress();
-  			  
-  			  UserEnterCritical();
-  			  nwk_tasks_pending.bits.NewAddressArrived = 0;
-  			  UserExitCritical();
-  		  }else
-  		  {
-  			  UserExitCritical();
-  		  }
-      #endif 
-
-                     
-      
       // Monta e transmite pacote com ping para vizinhança
 	    UserEnterCritical();
       if (nwk_tasks_pending.bits.DataPingPending == 1)  // set in BRTOS_TimerHook
@@ -598,15 +625,43 @@ void UNET_NWK(void *param)
 				UserExitCritical();
 			}
         }
-
-          #if (defined MULTICHANNEL_SUPPORT) && (MULTICHANNEL_SUPPORT==1)
-            SetChannel(rx_channel); /* back to saved RX channel */
-          #endif
       }else
       {
     	  UserExitCritical();
       }
       
+#if (USE_REACTIVE_UP_ROUTE == 1)
+      // Monta e transmite pacote de manutenção da rede up
+	  UserEnterCritical();
+      if (nwk_tasks_pending.bits.ReactiveUpMessagePending == 1)  // set in BRTOS_TimerHook
+      {
+          UserExitCritical();
+
+          ReactiveUpMessage();
+
+          UserEnterCritical();
+          nwk_tasks_pending.bits.ReactiveUpMessagePending = 0;
+          UserExitCritical();
+      }else
+      {
+    	  UserExitCritical();
+      }
+
+      // Verifica a tabela de rotas up
+      UserEnterCritical();
+      if (nwk_tasks_pending.bits.VerifyReactiveUpTable == 1)   // set in BRTOS_TimerHook
+      {
+          UserExitCritical();
+          VerifyUpRouteTable();
+          UserEnterCritical();
+      	  nwk_tasks_pending.bits.VerifyReactiveUpTable = 0;
+      	  UserExitCritical();
+      }else
+      {
+        UserExitCritical();
+      }
+#endif
+
       // Verifica a tabela de vizinhos
       UserEnterCritical();
       if (nwk_tasks_pending.bits.VerifyNeighbourhoodTable == 1)   // set in BRTOS_TimerHook
@@ -614,7 +669,7 @@ void UNET_NWK(void *param)
           UserExitCritical();
           VerifyNeighbourhood();
           UserEnterCritical();
-      	    nwk_tasks_pending.bits.VerifyNeighbourhoodTable = 0;
+      	  nwk_tasks_pending.bits.VerifyNeighbourhoodTable = 0;
       	  UserExitCritical();
       }else
       {
@@ -1101,17 +1156,7 @@ void UNET_MAC(void *param)
                         
                         OSSemPost(MAC_Event);
                         break;
-                      case BROADCAST_PACKET:
-                        if (VerifyPacketReplicated() == OK)
-                        {
-                          // Acorda tarefa de rede
-                          UserEnterCritical();
-                          nwk_tasks_pending.bits.BroadcastPending = 1;
-                          UserExitCritical();
-                          
-                          OSSemPost(MAC_Event);                        
-                        }
-                        break;
+
                       case ROUTE_PACKET:
                         if (VerifyPacketReplicated() == OK)
                         {
@@ -1124,17 +1169,6 @@ void UNET_MAC(void *param)
                         }
                         break;
                       
-                      case ADDRESS_PACKET:
-                        if (VerifyPacketReplicated() == OK)
-                        {
-                          // pacote de endereço novo
-                          UserEnterCritical();
-                            nwk_tasks_pending.bits.NewAddressArrived = 1;
-                          UserExitCritical();                            
-                          
-                          OSSemPost(MAC_Event);
-                        }
-                        break;                        
                       default:                        
                         break;
                     }
