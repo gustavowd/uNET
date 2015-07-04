@@ -80,9 +80,10 @@ enum destinos
 #define DEBUG_PKT                (INT8U)0x06
 #define RADIO_TXPL               (INT8U)0x07
 #define RADIO_NEWPOS             (INT8U)0x08
-#define UNET_INFO              (INT8U)0x09
+#define UNET_INFO              	 (INT8U)0x09
 #define RADIO_CHAN               (INT8U)0x0A
 #define APP_CONFIG_PARAM         (INT8U)0x0B
+#define CREATE_UP_PATH         	 (INT8U)0x0C
 
 
 

@@ -15,6 +15,12 @@
 // Network device type: see options above
 #define   DEVICE_TYPE                       PAN_COORDINATOR
 
+// Define router type
+#define   ROUTER1                   		0
+#define   ROUTER2                           1
+
+#define   ROUTER_TYPE                       ROUTER1
+
 // CPU memory alignment
 #define CPU_32_BITS                         1
 #define CPU_16_BITS                         0
@@ -112,12 +118,6 @@
 #define EUI_1 0x77
 #define EUI_0 0x84
 
-
-/// Configuration for tests only
-#define MULTICHANNEL_SUPPORT 0
-#define NUM_ALLOWED_CHANNELS 1
-
-#define FORCE_NO_MULTICHANNEL_SUPPORT 1
 
 
 #endif

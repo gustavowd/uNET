@@ -467,14 +467,19 @@ void UNET_NWK(void *param)
       unet_neighbourhood[i].IDTimeout           			= 0;
       unet_neighbourhood[i].NeighborDepth       			= NO_ROUTE_TO_BASESTATION;
       unet_neighbourhood[i].NeighborStatus.bits.Symmetric 	= FALSE;
-
-      #if (USE_REACTIVE_UP_ROUTE == 1)      
-      unet_routing_up_table[i].Addr_16b            = 0xFFFE;
-      unet_routing_up_table[i].DestinyAddr		   = 0xFFFE;
-      unet_routing_up_table[i].Destination         = FALSE;
-      #endif
    }    
    
+#if (USE_REACTIVE_UP_ROUTE == 1)
+   // Limpa rotas up
+   for(i=0;i<ROUTING_UP_TABLE_SIZE;i++)
+   {
+		unet_routing_up_table[i].Addr_16b            = 0xFFFE;
+		unet_routing_up_table[i].DestinyAddr		   = 0xFFFE;
+		unet_routing_up_table[i].Destination         = FALSE;
+		unet_routing_up_table[i].hops				   = 0;
+   }
+#endif
+
    // Limpa coordinator depth
    UserEnterCritical();
 #if(DEVICE_TYPE == PAN_COORDINATOR)
@@ -653,6 +658,7 @@ static void RFBufferClean(void)
 
 #if ((INCLUDE_PRINT == 1) && (DEVICE_TYPE == PAN_COORDINATOR))
 #include "UART.h"
+#include "utils.h"
 #endif
 
 // UNET MAC Handler
@@ -668,7 +674,11 @@ void UNET_MAC(void *param)
    INT8U packet_state = 0;
    INT8U packet_error = 0;
    INT16U CRCValue = 0;
-  
+
+#if ((INCLUDE_PRINT == 1) && (DEVICE_TYPE == PAN_COORDINATOR))
+   char buffer[8];
+#endif
+
    (void)param;
    packet_state = start_packet;
    BeaconCnt = 0; 

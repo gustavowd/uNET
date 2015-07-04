@@ -57,13 +57,34 @@ int main(void)
 	    while(1){};
 	  };
 
+#if (DEVICE_TYPE == PAN_COORDINATOR)
 	  if(InstallTask(&pisca_led_net,"Blink LED Example",512,APP2_Priority, NULL, &TH_NET_APP2) != OK)
 	  {
 	    // Oh Oh
 	    // Não deveria entrar aqui !!!
 	    while(1){};
 	  };
+#endif
 
+#if (DEVICE_TYPE == ROUTER)
+#if (ROUTER_TYPE == ROUTER1)
+	  if(InstallTask(&pisca_led_net,"Blink LED Example",512,APP2_Priority, NULL, &TH_NET_APP2) != OK)
+	  {
+	    // Oh Oh
+	    // Não deveria entrar aqui !!!
+	    while(1){};
+	  };
+#endif
+
+#if (ROUTER_TYPE == ROUTER2)
+	  if(InstallTask(&make_path,"Make up path",512,APP2_Priority, NULL, &TH_NET_APP2) != OK)
+	  {
+	    // Oh Oh
+	    // Não deveria entrar aqui !!!
+	    while(1){};
+	  };
+#endif
+#endif
 
 	  // Start Task Scheduler
 	  if(BRTOSStart() != OK)

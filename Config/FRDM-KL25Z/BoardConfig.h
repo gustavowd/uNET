@@ -47,7 +47,11 @@
 #define RFTX_m36dB  0xF8
 
 #define INCLUDE_PRINT		1
-#define PRINT_PING_INFO()	UARTPutString(0x4006A000, "Ping recebido\n\r");
+#define PRINT_PING_INFO()	UARTPutString(0x4006A000, "Ping recebido do nó ");\
+							UARTPutString(0x4006A000, PrintDecimal(mac_packet.SrcAddr_16b, buffer));\
+							UARTPutString(0x4006A000, " com RSSI ");\
+							UARTPutString(0x4006A000, PrintDecimal(mac_packet.Frame_RSSI, buffer));\
+							UARTPutString(0x4006A000, "\n\r");
 
 
 // Transceiver Configuration

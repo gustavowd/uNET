@@ -71,25 +71,18 @@ Copyright (c) <2009-2013> <Universidade Federal de Santa Maria>
 #define IN_PROGRESS_ROUTE    (INT8U)0x01
 
 // Maximum size of the neighbourhood table
-#define NEIGHBOURHOOD_SIZE      (INT8U)16
+#define NEIGHBOURHOOD_SIZE      (INT8U)8
 typedef INT16U                  NEIGHBOR_TABLE_T;
 #define ROUTING_UP_TABLE_SIZE   (INT8U)8
 
 /* Link reliability parameters */
-
-//#define RSSI_THRESHOLD          (INT8U)4
-//#define LOW_PARENT_THRESHOLD    (INT8U)8
-//#define RSSI_PARENT_THRESHOLD   (INT8U)20
-
-#define RSSI_THRESHOLD          (INT8U)0
-#define LOW_PARENT_THRESHOLD    (INT8U)10
-#define RSSI_PARENT_THRESHOLD   (INT8U)20
+#define RSSI_THRESHOLD          (INT8U)10
 
 /* Nwk Tx retries */
-#define NWK_TX_RETRIES          (INT8U)20
+#define NWK_TX_RETRIES          (INT8U)3
 
 /* Nwk Tx retries */
-#define NWK_TX_RETRIES_UP       (INT8U)(NWK_TX_RETRIES+6)
+#define NWK_TX_RETRIES_UP       (INT8U)(NWK_TX_RETRIES)
 
 // Set RX buffer control
 #define AUTO_ACK_CONTROL        0
@@ -165,8 +158,9 @@ typedef struct _UNET_SYMMETRIC_NEIGHBOURHOOD
 typedef struct _UNET_ROUTING_UP_TABLE
 {
     INT16U        Addr_16b;                   // 16 bit address from intermediate neighbor
-    INT16U		  DestinyAddr;				  // 16 bit address of the destiny node
-    INT8U         Destination;
+    INT16U		  DestinyAddr;				  // 16 bit address of the destination node
+    INT8U         Destination;				  // informs one hop distance to the destination node
+    INT8U		  hops;						  // Distance in hops to the destination node
 } UNET_ROUTING_UP_TABLE;
 
 

@@ -56,7 +56,7 @@ INT8U    Config_PARENT_THRESHOLD_MIN = 0;
 INT8U    Config_REPORT_PERIOD_1000MS = 30;
 INT8U    Config_REPORT_JITTER_100MS = 1;
 
-INT8U NetGeneralONOFF(INT8U state, INT8U direction, INT16U destiny)
+INT8U NetGeneralONOFF(INT8U state, INT16U destiny)
 {
   INT8U j = 0;
   INT8U status = 0;
@@ -68,7 +68,7 @@ INT8U NetGeneralONOFF(INT8U state, INT8U direction, INT16U destiny)
   NWKPayload[j++] = GENERAL_ONOFF;
   NWKPayload[j++] = state;
 
-  if (direction == DOWN_ROUTE){
+  if (destiny == 0){
 	  status = DownRoute(START_ROUTE,(INT8U)(j));
   }else{
 	  #if (USE_REACTIVE_UP_ROUTE == 1)
@@ -85,11 +85,33 @@ INT8U NetGeneralONOFF(INT8U state, INT8U direction, INT16U destiny)
 
 
 
+INT8U NetGeneralCreateUpPath(void)
+{
+  INT8U j = 0;
+  INT8U status = 0;
+
+  acquireRadio();
+
+  NWKPayload[j++] = APP_01;
+  NWKPayload[j++] = GENERAL_PROFILE;
+  NWKPayload[j++] = CREATE_UP_PATH;
+
+  status = DownRoute(START_ROUTE,(INT8U)(j));
+
+  releaseRadio();
+
+  return status;
+}
+
+
+
 
 /**
 * @fn     Decode_General_Profile
 * @brief  function to decode messages for General profile
 **/
+#include "UART.h"
+#include "utils.h"
 void Decode_General_Profile(void)
 {
     switch(app_packet.APP_Command)
@@ -171,6 +193,9 @@ void Decode_General_Profile(void)
       break;
                     
       default:
+#if (DEVICE_TYPE == PAN_COORDINATOR)
+    	  (void)UARTPutString(0x4006A000, "Comando genérico ");
+#endif
         break;
     }
 }
@@ -236,7 +261,7 @@ void Decode_SmartEnergy_Profile(void)
     }
 }
 
-void SniferRep(INT8U direction, INT16U atributte, INT16U destiny)
+void SniferRep(INT16U atributte, INT16U destiny)
 {
   INT8U i = 0;
   INT8U j = 0;
@@ -276,10 +301,15 @@ void SniferRep(INT8U direction, INT16U atributte, INT16U destiny)
   NWKPayload[j++] = (INT8U) GetTxPower();
   
  
-  if (direction == DOWN_ROUTE)
-    status = DownRoute(START_ROUTE,(INT8U)(j));
-  else
-    status = ReactiveUpRoute(START_ROUTE,(INT8U)(j), destiny);
+  if (destiny == 0){
+	  status = DownRoute(START_ROUTE,(INT8U)(j));
+  }else{
+	  #if (USE_REACTIVE_UP_ROUTE == 1)
+	  status = ReactiveUpRoute(START_ROUTE,(INT8U)(j),destiny);
+	  #else
+	  status = NO_ROUTE_AVAILABLE;
+	  #endif
+  }
 
   (void)status;
 }
@@ -471,7 +501,7 @@ INT8U NetSimpleMeasureSE(INT8U MeasureType, INT16U Value16, INT32U Value32)
 * @brief  function to send message for General profile
 **/
 
-INT8U NetGeneralInfo(INT8U MeasureType, INT8U Value8,INT16U Value16)
+INT8U NetGeneralInfo(INT8U MeasureType, INT8U Value8,INT16U Value16, INT16U destiny)
 {
   INT8U j = 0;
   INT8U status = 0;
@@ -500,7 +530,15 @@ INT8U NetGeneralInfo(INT8U MeasureType, INT8U Value8,INT16U Value16)
   }
   
 
-  status = DownRoute(START_ROUTE,(INT8U)(4+j));
+  if (destiny == 0){
+	  status = DownRoute(START_ROUTE,(INT8U)(j));
+  }else{
+	  #if (USE_REACTIVE_UP_ROUTE == 1)
+	  status = ReactiveUpRoute(START_ROUTE,(INT8U)(j),destiny);
+	  #else
+	  status = NO_ROUTE_AVAILABLE;
+	  #endif
+  }
   
   releaseRadio();
   

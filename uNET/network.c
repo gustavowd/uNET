@@ -687,6 +687,7 @@ INT8U HandleRoutePacket(void)
 				  }
 				  // Copia o endereço do nó de origem do pacote para a lista de rotas up disponíveis
 				  unet_routing_up_table[i].DestinyAddr = nwk_packet.NWK_Source;
+				  unet_routing_up_table[i].hops 	   = nwk_packet.NWK_Packet_Life + 1;
 
 				}
         	}
@@ -789,7 +790,11 @@ INT8U HandleRoutePacket(void)
         {
           if (attempts < (NWK_TX_RETRIES-1))
           {
-            NWK_Command(unet_neighbourhood[match_count].Addr_16b, NWK_DEST, (INT8U)(mac_packet.Payload_Size - NWK_OVERHEAD),(INT8U)(nwk_packet.NWK_Packet_Life+1),0);
+        	if ((nwk_packet.NWK_Parameter&NWK_DIRECTION) == NWK_DIRECTION){
+        		NWK_Command(unet_neighbourhood[match_count].Addr_16b, DEST_DOWN, (INT8U)(mac_packet.Payload_Size - NWK_OVERHEAD),(INT8U)(nwk_packet.NWK_Packet_Life+1),0);
+        	}else{
+        		NWK_Command(unet_neighbourhood[match_count].Addr_16b, DEST_UP, (INT8U)(mac_packet.Payload_Size - NWK_OVERHEAD),(INT8U)(nwk_packet.NWK_Packet_Life+1),0);
+        	}
             semaphore_return = OSSemPend(RF_TX_Event,(INT16U)(TX_TIMEOUT+RadioRand()));
             
             if (semaphore_return == OK)

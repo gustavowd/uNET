@@ -97,18 +97,33 @@ void System_Time(void *param)
 }
 
 #if (DEVICE_TYPE == ROUTER)
+#if (ROUTER_TYPE == ROUTER1)
 void pisca_led_net(void *param)
 {
 	(void)param;
 	for(;;)
 	{
 		// Envia mensagem para o coordenador
-		NetGeneralONOFF(TRUE, DOWN_ROUTE, 0);
+		NetGeneralONOFF(TRUE, 0);
 		DelayTask(1000);
-		NetGeneralONOFF(FALSE, DOWN_ROUTE, 0);
+		NetGeneralONOFF(FALSE, 0);
 		DelayTask(1000);
 	}
 }
+#endif
+
+#if (ROUTER_TYPE == ROUTER2)
+void make_path(void *param)
+{
+	(void)param;
+	for(;;)
+	{
+		// Envia mensagem para o coordenador
+		NetGeneralCreateUpPath();
+		DelayTask(5000);
+	}
+}
+#endif
 #endif
 
 
@@ -116,23 +131,28 @@ void pisca_led_net(void *param)
 void pisca_led_net(void *param)
 {
 	INT16U neighbor;
+	int i = 0;
 	(void)param;
 	for(;;)
 	{
 		// Envia mensagem para o primeiro vizinho da lista
-		if ((unet_neighbourhood[0].Addr_16b != 0xFFFE) && (unet_neighbourhood[0].NeighborStatus.bits.Symmetric == TRUE))
-		{
-			neighbor = unet_neighbourhood[0].Addr_16b;
-			NetGeneralONOFF(TRUE, UP_ROUTE, neighbor);
-			DelayTask(1000);
-			NetGeneralONOFF(FALSE, UP_ROUTE, neighbor);
+		for(i=0;i<ROUTING_UP_TABLE_SIZE;i++){
+			//if ((unet_neighbourhood[i].Addr_16b != 0xFFFE) && (unet_neighbourhood[i].NeighborStatus.bits.Symmetric == TRUE))
+			if (unet_routing_up_table[i].DestinyAddr != 0xFFFE)
+			{
+				neighbor = unet_neighbourhood[i].Addr_16b;
+				NetGeneralONOFF(TRUE, neighbor);
+				DelayTask(1000);
+				NetGeneralONOFF(FALSE, neighbor);
+			}
+			DelayTask(100);
 		}
-		DelayTask(1000);
 	}
 }
 #endif
 
 #include "UART.h"
+#include "utils.h"
 
 void UNET_App_1_Decode(void *param)
 {
@@ -140,6 +160,9 @@ void UNET_App_1_Decode(void *param)
    INT8U  ret = 0;
 #endif
 
+#if (DEVICE_TYPE == PAN_COORDINATOR)
+   char buffer[8];
+#endif
    (void)param;
 
 	// Enables the port clock
@@ -181,7 +204,9 @@ void UNET_App_1_Decode(void *param)
        {
         case GENERAL_PROFILE:
 		  #if (DEVICE_TYPE == PAN_COORDINATOR)
-          (void)UARTPutString(UART0_BASE, "Pacote do perfil geral recebido!\n\r");
+          (void)UARTPutString(UART0_BASE, "Pacote do perfil geral recebido do nó ");
+          (void)UARTPutString(0x4006A000, PrintDecimal(nwk_packet.NWK_Source, buffer));\
+          (void)UARTPutString(0x4006A000, "\n\r");
 		  #endif
           Decode_General_Profile();
           break;
