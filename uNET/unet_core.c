@@ -289,6 +289,7 @@ void BRTOS_TimerHook(void)
         }
 
 		#if (USE_REACTIVE_UP_ROUTE == 1)
+		#if (REACTIVE_UP_ROUTE_AUTO_MAINTENANCE == 1)
     	// Contador que define o momento para transmitir o ping da vizinhança
         ReactiveUpCnt++;
         if (ReactiveUpCnt >= ReactiveUpTimeV)
@@ -322,6 +323,7 @@ void BRTOS_TimerHook(void)
             // Acorda a tarefa de rede
             OSSemPost(MAC_Event);
         }
+		#endif
 		#endif
         
     }

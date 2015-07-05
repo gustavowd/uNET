@@ -28,6 +28,7 @@
 
 // Reactive up route - 1 = on, 0 = off
 #define USE_REACTIVE_UP_ROUTE               1
+#define REACTIVE_UP_ROUTE_AUTO_MAINTENANCE  1
 
 // UNET Tasks Priorities
 #define RF_EventHandlerPriority     (INT8U)31
