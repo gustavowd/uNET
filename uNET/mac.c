@@ -633,17 +633,17 @@ INT8U UNET_Associate(void)
    // pela menor profundidade
    
   AssociateLoop:
-   aux = 255;
+   aux = 0;
    j = 0;
    
    for(i=0;i<BeaconCnt;i++)
    {
-      if (unet_beacon[i].DeviceDepth < aux)
+      if (unet_beacon[i].Beacon_RSSI > aux)
       {
         // Verifica se já não houve tentativa de associação negada
         if(unet_beacon[i].AssociationStatus == 0)
         {
-            aux = unet_beacon[i].DeviceDepth;
+            aux = unet_beacon[i].Beacon_RSSI;
             j = i;
         }
       }
