@@ -458,7 +458,7 @@ void UNET_NWK(void *param)
                   
           // Gera endereço estocástico
     	  // Temos que pegar os dados de algum define e depois gravar na flash
-	  	  macAddr = (INT16U)1;
+	  	  macAddr = (INT16U)ROUTER_AUTO_ASSOCIATION_MAC_ADDR;
 	  	  macPANId = 0x4742;
 
 	  	  // Grava os endereços mac e panid no radio

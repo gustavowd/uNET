@@ -10,16 +10,23 @@
 #define   PAN_COORDINATOR                   0
 #define   ROUTER                            1
 
-#define ROUTER_AUTO_ASSOCIATION				FALSE
-
 // Network device type: see options above
-#define   DEVICE_TYPE                       ROUTER
+#define   DEVICE_TYPE                       PAN_COORDINATOR
 
 // Define router type
 #define   ROUTER1                   		0
 #define   ROUTER2                           1
 
 #define   ROUTER_TYPE                       ROUTER2
+
+
+#define ROUTER_AUTO_ASSOCIATION				TRUE
+#if (ROUTER_AUTO_ASSOCIATION == TRUE)
+#define ROUTER_AUTO_ASSOCIATION_MAC_ADDR	1
+#endif
+#ifndef ROUTER_AUTO_ASSOCIATION_MAC_ADDR
+	#error	Defina o endereço MAC do roteador na variável ROUTER_AUTO_ASSOCIATION_MAC_ADDR
+#endif
 
 // CPU memory alignment
 #define CPU_32_BITS                         1
