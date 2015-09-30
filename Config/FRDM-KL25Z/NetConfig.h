@@ -17,12 +17,17 @@
 #define   ROUTER1                   		0
 #define   ROUTER2                           1
 
-#define   ROUTER_TYPE                       ROUTER2
+#define   ROUTER_TYPE                       ROUTER1
 
 
 #define ROUTER_AUTO_ASSOCIATION				TRUE
 #if (ROUTER_AUTO_ASSOCIATION == TRUE)
+#if (ROUTER == ROUTER1)
 #define ROUTER_AUTO_ASSOCIATION_MAC_ADDR	1
+#endif
+#if (ROUTER == ROUTER2)
+#define ROUTER_AUTO_ASSOCIATION_MAC_ADDR	2
+#endif
 #endif
 #ifndef ROUTER_AUTO_ASSOCIATION_MAC_ADDR
 	#error	Defina o endereço MAC do roteador na variável ROUTER_AUTO_ASSOCIATION_MAC_ADDR
@@ -39,6 +44,7 @@
 
 // UNET Tasks Priorities
 #define RF_EventHandlerPriority     (INT8U)31
+#define Timer_Priority     			(INT8U)29
 #define UNET_Mutex_Priority         (INT8U)27
 #define MAC_HandlerPriority         (INT8U)22
 #define NWK_HandlerPriority         (INT8U)23

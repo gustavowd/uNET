@@ -85,7 +85,6 @@ INT8U NetGeneralONOFF(INT8U state, INT16U destiny)
 
 
 
-#if 0
 INT8U NetGeneralCreateUpPath(void)
 {
   INT8U j = 0;
@@ -103,7 +102,6 @@ INT8U NetGeneralCreateUpPath(void)
 
   return status;
 }
-#endif
 
 
 
@@ -131,7 +129,7 @@ void Decode_General_Profile(void)
             //SensorLight_Enable();
         	GPIOPinSet(GPIOB_BASE, GPIO_PIN_18);
         }  
-        break;
+        break;       
         
       case SNIFER_REQ:
 	#if 0
@@ -191,12 +189,14 @@ void Decode_General_Profile(void)
           default:
           break;
         }
-      
       break;
+      
+      case CREATE_UP_PATH:
+      break;      
                     
       default:
 #if (DEVICE_TYPE == PAN_COORDINATOR)
-    	  (void)UARTPutString(0x4006A000, "Comando genérico ");
+    	  (void)UARTPutString(0x4006A000, "Comando genérico! \n\r");
 #endif
         break;
     }

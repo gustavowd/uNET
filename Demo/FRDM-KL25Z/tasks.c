@@ -81,14 +81,14 @@ void System_Time(void *param)
 	   WDTimerRestart();
 	   #endif
 
-      DelayTask(10); /* wait 10 ticks -> 10 ms */
+      DelayTask(25); /* wait 10 ticks -> 10 ms */
 
       #if RADIO_DRIVER_WATCHDOG == 1
            //Radio_Count_states();
       #endif
       
       i++;
-      if (i >= 100)
+      if (i >= 40)
       {
         OSUpdateUptime();
         i = 0;
@@ -113,7 +113,6 @@ void pisca_led_net(void *param)
 #endif
 
 #if (ROUTER_TYPE == ROUTER2)
-#if 0
 void make_path(void *param)
 {
 	(void)param;
@@ -126,7 +125,6 @@ void make_path(void *param)
 }
 #endif
 #endif
-#endif
 
 
 #if (DEVICE_TYPE == PAN_COORDINATOR)
@@ -135,6 +133,9 @@ void pisca_led_net(void *param)
 	INT16U neighbor;
 	int i = 0;
 	(void)param;
+	
+	DelayTask(1000);
+	
 	for(;;)
 	{
 		// Envia mensagem para o primeiro vizinho da lista
@@ -218,7 +219,7 @@ void UNET_App_1_Decode(void *param)
           (void)UARTPutString(UART0_BASE, "Pacote do perfil lighting recebido!\n\r");
 		  #endif
           //Decode_Lighting_Profile();
-          break;
+          break;       
 
         #if (defined BOOTLOADER_ENABLE) && (BOOTLOADER_ENABLE==1)
         case BULK_DATA_PROFILE:
@@ -310,6 +311,34 @@ void pisca_led(void *param)
 			GPIOPinReset(GPIOB_BASE, GPIO_PIN_19);
 		}
 		DelayTask(200);
+	}
+}
+
+void led_activity(void *param){
+	int flag = 0;
+	
+	// Enables the port clock
+	SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+
+	GPIOPinConfigure(GPIO_PB19_PB19);
+
+	// Enables Drive Strength
+	GPIOPadConfigSet (GPIOB_BASE, GPIO_PIN_19, PORT_TYPE_DSE_HIGH);
+
+	// Set port for LED to output
+	GPIOPinSet(GPIOB_BASE, GPIO_PIN_19);
+	xGPIODirModeSet(GPIOB_BASE, GPIO_PIN_19, xGPIO_DIR_MODE_OUT);
+	
+	
+	while(1){
+		DelayTask(100);
+		if (flag){
+			flag = 0;
+			GPIOPinReset(GPIOB_BASE, GPIO_PIN_19);
+		}else{
+			flag = 1;
+			GPIOPinSet(GPIOB_BASE, GPIO_PIN_19);
+		}
 	}
 }
 

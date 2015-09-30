@@ -27,6 +27,7 @@ Copyright (c) <2009-2013> <Universidade Federal de Santa Maria>
 
 #include "hardware.h"
 #include "BRTOS.h"
+#include "timers.h"
 #include "spi.h"
 #include "MRF24J40.h" 
 #include "app.h"
@@ -212,14 +213,18 @@ void UNET_Init(void)
 
 static INT16U   StatTimer             = 0;
 static INT16U   AssociateTimeout      = 0;
-static INT16U   NeighborCnt           = 0;
 volatile INT16U NeighborPingTimeV     = 60000;
-static INT32U   NeighbourhoodCnt      = 0;
 volatile INT16U ping_retries = 0;
+#if (TICKLESS != 1)
+static INT16U   NeighborCnt           = 0;
+static INT32U   NeighbourhoodCnt      = 0;
+#endif
 
 #if (USE_REACTIVE_UP_ROUTE == 1)
 static INT32U ReactiveUpTimeV         = 60000;
+#if (TICKLESS != 1)
 static INT32U ReactiveUpTableCnt      = 0;
+#endif
 #endif
 
 volatile INT16U debug_tx_count1 = 0;
@@ -227,16 +232,98 @@ volatile INT16U debug_tx_count2 = 0;
 volatile INT16U debug_tx_count3 = 0;
 volatile INT16U debug_tx_count4 = 0;
 
+
+#if (TICKLESS == 1)
+BRTOS_TIMER neighbourhood_timer;
+BRTOS_TIMER ping_timer;
+BRTOS_TIMER reative_up_maintenance_timer;
+BRTOS_TIMER reative_up_table_timer;
+
+TIMER_CNT neighbourhood_callback(void)
+{
+	// Avisa que deve verificar a tabela de vizinhança
+	nwk_tasks_pending.bits.VerifyNeighbourhoodTable = 1;
+
+	// Acorda a tarefa de rede
+	OSSemPost(MAC_Event);
+
+	return (INT16U)NEIGHBOURHOOD_TIMEOUT;
+}
+
+TIMER_CNT ping_callback(void)
+{
+    if (NeighborPingTimeCnt < MAX_PING_TIME)
+    {
+        NeighborPingTimeCnt++;
+    }
+    NeighborPingTimeV = (NEIGHBOR_PING_TIME * NeighborPingTimeCnt) + RadioRand();
+
+    if (mac_tasks_pending.bits.AssociationInProgress != 1)
+    {
+		// Avisa que há um ping pendente
+		nwk_tasks_pending.bits.DataPingPending = 1;
+
+		// Transmite PING_RETRIES pings
+		ping_retries = 0;
+		nwk_tasks_pending.bits.RetryBroadcast = 1;
+
+		// Acorda a tarefa de rede
+		OSSemPost(MAC_Event);
+    }
+
+	return NeighborPingTimeV;
+}
+
+TIMER_CNT reative_up_maintenance_callback(void)
+{
+	// Contador que define o momento para transmitir o ping da vizinhança
+	if (ReactiveUpTimeCnt < MAX_UPROUTE_MAINTENANCE_TIME)
+	{
+		ReactiveUpTimeCnt++;
+	}
+	ReactiveUpTimeV = (REACTIVE_UP_MESSAGE_TIME * ReactiveUpTimeCnt) + RadioRand();
+
+	if (mac_tasks_pending.bits.AssociationInProgress != 1)
+	{
+		// Avisa que há mensagem de manutenção de rede up pendente
+		nwk_tasks_pending.bits.ReactiveUpMessagePending = 1;
+
+		// Acorda a tarefa de rede
+		OSSemPost(MAC_Event);
+	}
+
+	return ReactiveUpTimeV;
+}
+
+TIMER_CNT reative_up_table_callback(void)
+{
+	// Avisa que deve verificar a tabela de vizinhança
+	nwk_tasks_pending.bits.VerifyReactiveUpTable = 1;
+
+	// Acorda a tarefa de rede
+	OSSemPost(MAC_Event);
+
+	return (INT16U)REACTIVE_UP_TIMEOUT;
+}
+#endif
+
+#if (TICKLESS == 1)
+extern volatile INT16U 		time_next_task;
+#endif
+
 /** UNET Network Timeout Function */
 void BRTOS_TimerHook(void)
 {   
-    
 #if NETWORK_ENABLE == 1    
     
     // Realiza esta operação se está em processo de associação
     if (mac_tasks_pending.bits.AssociationInProgress)
     {
-        AssociateTimeout++;
+		#if (TICKLESS == 1)
+    	AssociateTimeout += time_next_task;
+		#else
+    	AssociateTimeout++;
+		#endif
         if (AssociateTimeout >= (aResponseWaitTime+49)) 
         {
             mac_tasks_pending.bits.AssociationInProgress = 0;
@@ -244,6 +331,7 @@ void BRTOS_TimerHook(void)
         }
     }
     
+#if (TICKLESS != 1)
     if (mac_tasks_pending.bits.isAssociated == 1)
     {
     	// Contador que define o momento para transmitir o ping da vizinhança
@@ -327,9 +415,14 @@ void BRTOS_TimerHook(void)
 		#endif
         
     }
+#endif
 
     // Verifica se o radio está muito tempo sem receber mensagens
+	#if (TICKLESS == 1)
+    RadioWatchdog += time_next_task;
+	#else
     RadioWatchdog++;
+	#endif
     if (RadioWatchdog > RadioWatchdogTimeout)
     {
       RadioWatchdog = 0;
@@ -498,14 +591,16 @@ void UNET_NWK(void *param)
     ACTIVITY_LED_HIGH;
    #endif
    
-   // Liga LED indicando que está associado
-   #if (defined DEBUG_EXATRON && DEBUG_EXATRON == 1)
-     #if (BDM_ENABLE == 0)
-         BDM_DEBUG_OUT = 1;  /* turn off DEBUG OUT */
-         DelayTask(500);
-         BDM_DEBUG_OUT = 0;  /* turn on DEBUG OUT */
-     #endif 
-   #endif
+#if TICKLESS == 1
+   /* BRTOS Soft Timer Init : start BRTOS Timer Service
+      with stack size and priority for the Timer Task */
+    OSTimerInit(512,Timer_Priority);
+
+    OSTimerSet (&neighbourhood_timer, neighbourhood_callback, (INT16U)NEIGHBOURHOOD_TIMEOUT);
+    OSTimerSet (&ping_timer, ping_callback, NeighborPingTimeV);
+    OSTimerSet (&reative_up_maintenance_timer, reative_up_maintenance_callback, ReactiveUpTimeV);
+    OSTimerSet (&reative_up_table_timer, reative_up_table_callback, (INT16U)REACTIVE_UP_TIMEOUT);
+#endif
    
    // Limpa fila da vizinhança
    for(i=0;i<NEIGHBOURHOOD_SIZE;i++)

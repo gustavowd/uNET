@@ -102,7 +102,8 @@
 
 
 /// TickTimer Defines
-#define configCPU_CLOCK_HZ          	(INT32U)48000000   ///< CPU clock in Hertz
+#define configCPU_CLOCK_HZ          	(INT32U)40000000   ///< CPU clock in Hertz
+#define configExtClk_CLOCK_HZ        	(INT32U)8000000    ///< External crystal clock in Hertz
 
 #if (THREAD_METRIC == 1)
 	#define configTICK_RATE_HZ          (INT32U)100         ///< Tick timer rate in Hertz
@@ -123,7 +124,7 @@
 
 /// Stack Defines
 /// 16KB of RAM (total): 34 * 128 bytes = 4.25KB of Virtual Stack
-#define HEAP_SIZE 34*128
+#define HEAP_SIZE 36*128
 
 // Queue heap defines
 // Configurado com 896 bytes p/ filas
