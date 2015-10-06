@@ -79,7 +79,11 @@ typedef INT16U                  NEIGHBOR_TABLE_T;
 #define RSSI_THRESHOLD          (INT8U)10
 
 /* Nwk Tx retries */
+#if (CONTIKI_MAC_ENABLE == 1)
+#define NWK_TX_RETRIES          (INT8U)50	  
+#else
 #define NWK_TX_RETRIES          (INT8U)3
+#endif
 
 /* Nwk Tx retries */
 #define NWK_TX_RETRIES_UP       (INT8U)(NWK_TX_RETRIES)

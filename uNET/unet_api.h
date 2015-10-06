@@ -35,7 +35,7 @@ Copyright (c) <2009-2013> <Universidade Federal de Santa Maria>
 #include "unet_app.h"
 #include "MRF24J40.h"
 
-#define UNET_VERSION    "Network Ver. 1.0.5"
+#define UNET_VERSION    "Network Ver. 1.3.0"
 
 /* Message code returns */ 
 #define SEND_OK              (INT8U)0x00

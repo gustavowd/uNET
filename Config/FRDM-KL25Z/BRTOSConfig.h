@@ -39,7 +39,7 @@
 
 /// Define the maximum number of Tasks to be Installed
 /// must always be equal or higher to NumberOfInstalledTasks
-#define NUMBER_OF_TASKS 		(INT8U)8
+#define NUMBER_OF_TASKS 		(INT8U)10
 
 /// Defines the memory allocation and deallocation function to the dynamic queues
 #define BRTOS_ALLOC   //malloc
@@ -123,9 +123,9 @@
 
 
 /// Stack Defines
-/// 16KB of RAM (total): 34 * 128 bytes = 4.25KB of Virtual Stack
-#define HEAP_SIZE 36*128
+/// 16KB of RAM (total): 48 * 128 bytes = 6KB of Virtual Stack
+#define HEAP_SIZE 48*128
 
 // Queue heap defines
 // Configurado com 896 bytes p/ filas
-#define QUEUE_HEAP_SIZE 8*128
+#define QUEUE_HEAP_SIZE 11*512

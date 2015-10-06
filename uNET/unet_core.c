@@ -54,6 +54,11 @@ BRTOS_TH	TH_RADIO;
 BRTOS_TH	TH_MAC;
 BRTOS_TH	TH_NETWORK;
 
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+BRTOS_TH	TH_CONTIKIMAC;
+void Contiki_Task(void *param);
+#endif
+
 #ifdef SIGNAL_APP1
 BRTOS_Sem    *(SIGNAL_APP1);
 #endif
@@ -208,6 +213,13 @@ void UNET_Init(void)
   {
      while(1){};
   }
+  
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+  if(InstallTask(&Contiki_Task,"UNET NWK Handler",ContikiMAC_StackSize,ContikiMACPriority, NULL, &TH_NETWORK) != OK)
+  {
+     while(1){};
+  }  
+#endif
 
 }
 
@@ -222,7 +234,7 @@ static INT32U   NeighbourhoodCnt      = 0;
 
 #if (USE_REACTIVE_UP_ROUTE == 1)
 static INT32U ReactiveUpTimeV         = 60000;
-#if (TICKLESS != 1)
+#if ((TICKLESS != 1) && (DEVICE_TYPE != PAN_COORDINATOR))
 static INT32U ReactiveUpTableCnt      = 0;
 #endif
 #endif
@@ -231,6 +243,10 @@ volatile INT16U debug_tx_count1 = 0;
 volatile INT16U debug_tx_count2 = 0;
 volatile INT16U debug_tx_count3 = 0;
 volatile INT16U debug_tx_count4 = 0;
+#if (CONTIKI_MAC_ENABLE == 1)
+volatile INT16U start_ping_time = 0;
+volatile INT16U stop_ping_time = 0;
+#endif
 
 
 #if (TICKLESS == 1)
@@ -260,7 +276,11 @@ TIMER_CNT ping_callback(void)
 
     if (mac_tasks_pending.bits.AssociationInProgress != 1)
     {
-		// Avisa que há um ping pendente
+#if (CONTIKI_MAC_ENABLE == 1)    	
+    	start_ping_time = OSGetTickCount();
+    	stop_ping_time = 0;
+#endif
+    	// Avisa que há um ping pendente
 		nwk_tasks_pending.bits.DataPingPending = 1;
 
 		// Transmite PING_RETRIES pings
@@ -347,11 +367,11 @@ void BRTOS_TimerHook(void)
 
             if (mac_tasks_pending.bits.AssociationInProgress != 1)
             {
-				// Avisa que há um ping pendente
-            	debug_tx_count1 = 0;
-            	debug_tx_count2 = 0;
-            	debug_tx_count3 = 0;
-            	debug_tx_count4 = 0;
+#if (CONTIKI_MAC_ENABLE == 1)            	
+            	start_ping_time = OSGetTickCount();
+            	stop_ping_time = 0;
+#endif
+            	// Avisa que há um ping pendente
 				nwk_tasks_pending.bits.DataPingPending = 1;
 
 				// Transmite PING_RETRIES pings
@@ -377,7 +397,7 @@ void BRTOS_TimerHook(void)
         }
 
 		#if (USE_REACTIVE_UP_ROUTE == 1)
-		#if (REACTIVE_UP_ROUTE_AUTO_MAINTENANCE == 1)
+		#if ((REACTIVE_UP_ROUTE_AUTO_MAINTENANCE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
     	// Contador que define o momento para transmitir o ping da vizinhança
         ReactiveUpCnt++;
         if (ReactiveUpCnt >= ReactiveUpTimeV)
@@ -598,7 +618,9 @@ void UNET_NWK(void *param)
 
     OSTimerSet (&neighbourhood_timer, neighbourhood_callback, (INT16U)NEIGHBOURHOOD_TIMEOUT);
     OSTimerSet (&ping_timer, ping_callback, NeighborPingTimeV);
+#if ((REACTIVE_UP_ROUTE_AUTO_MAINTENANCE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
     OSTimerSet (&reative_up_maintenance_timer, reative_up_maintenance_callback, ReactiveUpTimeV);
+#endif
     OSTimerSet (&reative_up_table_timer, reative_up_table_callback, (INT16U)REACTIVE_UP_TIMEOUT);
 #endif
    
@@ -680,12 +702,29 @@ void UNET_NWK(void *param)
   		}
            
       // Monta e transmite pacote com ping para vizinhança
-	    UserEnterCritical();
+#if (CONTIKI_MAC_ENABLE == 1)
+next_ping:      
+#endif
+	  UserEnterCritical();
       if (nwk_tasks_pending.bits.DataPingPending == 1)  // set in BRTOS_TimerHook
       {
           UserExitCritical();
            
           debug_tx_count4++;
+          
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+          if (!GetRadioStatus()){
+        	  SetRadioStatus(1);
+			  RADIO_WAKE_STATUS_OLD = RADIO_WAKE_STATUS;
+			  // Se o rádio estiver desligado, liga o radio
+			  if( RADIO_WAKE_STATUS == RADIO_SLEEPING){
+				  // Liga o rádio e espera tempo de estabilização
+				  WakeupRadio();
+				  DelayTask(2);
+			  }
+          }
+#endif
+          
           NeighborPing();
 		  ping_retries++;
 
@@ -705,18 +744,46 @@ void UNET_NWK(void *param)
           UserExitCritical();
 
     	if(nwk_tasks_pending.bits.RetryBroadcast == 1)
-        {
-    		if (ping_retries < PING_RETRIES)
+        {    		
+#if (CONTIKI_MAC_ENABLE == 1)
+    		// Descobre o tempo total do processo
+    		stop_ping_time = OSGetTickCount();
+
+    		if (stop_ping_time > start_ping_time)
+    		{
+    			stop_ping_time = stop_ping_time - start_ping_time;
+    		}else
+    		{
+    			stop_ping_time = stop_ping_time + (TICK_COUNT_OVERFLOW - start_ping_time);
+			}
+
+    		if (stop_ping_time < 132)
 			{
 				// Avisa que há um ping pendente
     			UserEnterCritical();
 				nwk_tasks_pending.bits.DataPingPending = 1;
 				UserExitCritical();
-
+				
+				goto next_ping;
+#else
+	    	if (ping_retries < PING_RETRIES)
+			{				
+				// Avisa que há um ping pendente
+    			UserEnterCritical();
+				nwk_tasks_pending.bits.DataPingPending = 1;
+				UserExitCritical();
+				
 				// Acorda a tarefa de rede
 				OSSemPost(MAC_Event);
+#endif
 			}else
 			{
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))		        
+				SetRadioStatus(0);
+				// Se no estado anterior o radio estava desligado, desliga o radio agora
+		        if( RADIO_WAKE_STATUS_OLD == RADIO_SLEEPING) SleepRadio();
+#endif
+				
 				UserEnterCritical();
 				nwk_tasks_pending.bits.RetryBroadcast = 0;
 				UserExitCritical();
@@ -1385,7 +1452,7 @@ void UNET_RF_Event(void *param)
   {
       // Stop Task to wait RF Event
       OSSemPend (RF_Event,0);
-        
+      
       // read the interrupt status register to see what caused the interrupt        
       flags.Val=PHYGetShortRAMAddr(READ_ISRSTS);
            
@@ -1435,7 +1502,11 @@ void UNET_RF_Event(void *param)
             
       if(flags.bits.RF_RXIF)
       {                      
-         // packet received
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+    	  SetRadioStatus(1);
+#endif
+    	  
+    	 // packet received
          // Need to read it out          
          // Disable receiving packets off air
          PHYSetShortRAMAddr(WRITE_BBREG1,0x04);
@@ -1482,6 +1553,10 @@ void UNET_RF_Event(void *param)
              OSWQueue(&RFBuffer,RSSI_VAL);
              OSWQueue(&RFBuffer,LQI_VAL);
              
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+             SetRadioStatus(0);
+#endif             
+             
              OSSemPost(RF_RX_Event);
              
              /* Não tem espaço para o próximo pacote ? */
@@ -1496,8 +1571,13 @@ void UNET_RF_Event(void *param)
             CHECK_NODESTAT(UNET_NodeStat.overbuf);
          }
          
-        // Reinicia o ponteiro do buffer RX
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+         // Reinicia o ponteiro do buffer RX
+        PHYSetShortRAMAddr(WRITE_RXFLUSH, 0x61);         
+#else
+         // Reinicia o ponteiro do buffer RX
         PHYSetShortRAMAddr(WRITE_RXFLUSH, 0x01);
+#endif        
         // bypass MRF24J40 errata 5
         PHYSetShortRAMAddr(WRITE_FFOEN, 0x98);        
         //  Enable receiving packets off air
@@ -1507,8 +1587,7 @@ void UNET_RF_Event(void *param)
       
       (void)RFFLAG;           // Lê o registrador de ISR
       RFIF;                   // Limpa a flag de ISR
-      RFINT_ENABLE;           // Habilita interrupção de hardware ligada ao pino INT
-      
+      RFINT_ENABLE;           // Habilita interrupção de hardware ligada ao pino INT 
   }
 }
 
@@ -1520,6 +1599,126 @@ INT8U* GetUNET_Statistics(INT8U* tamanho){
     return (INT8U*)&UNET_NodeStat;
 }
 
+
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+void Contiki_Task(void *param){
+	  INT16U tick_count;
+	  INT16U val_anterior;
+	  
+	  // Espera associação. Só usa o ContikiMac depois de associado	  
+	  do{
+		  DelayTask(2);
+	  }while((mac_tasks_pending.bits.isAssociated == 0));
+	  
+	  SysCtlPeripheralEnable(SYSCTL_PERIPH_TMR1);
+	  TPM1_MOD = 0xFFFF;
+ 
+	for(;;){
+		//volatile INT8U read_bbreg6	= 0;
+		//volatile unsigned char rssi	= 0;
+
+		val_anterior = OSGetTickCount();
+		
+#if 1
+		if (!GetRadioStatus()){
+			acquireRadio();
+			
+			WakeupRadio();
+			//aguarda o tempo para estabilizar o oscilador apos acordar o radio
+			DelayTask(12);
+			
+			while (GetRadioStatus()){
+				DelayTask(1);
+			}			
+			SleepRadio();
+			releaseRadio();
+		}
+#endif
+		
+		
+#if 0
+		//se radio não estiver ocupado transmitindo algo
+		if (!GetRadioStatus()){
+			acquireRadio();
+			
+	        // Disable receiving packets off air
+			WakeupRadio();
+	        //PHYSetShortRAMAddr(WRITE_BBREG1,0x04);
+
+			/*20MRECVR: 20 MHz Clock Recovery Control bits
+			Recovery from Sleep control.
+			1 = Less than 1 ms (recommended)
+			0 = Less than 3 ms (default)
+			*/
+			//aguarda o tempo para estabilizar o oscilador apos acordar o radio
+			DelayTask(2);
+			
+			if (!GetRadioStatus()){							
+				//Liga um timer para timeout
+				TPM1_CNT = 0;		
+				TPM1_SC = 0x08;
+				/* Como o rádio não pode ser desligado por 0.5ms,
+				   realiza o cálculo de rssi por um período de 1ms */
+				do{
+					// Faz o pedido para cálculo de RSSI para o rádio
+					PHYSetShortRAMAddr(WRITE_BBREG6, 0x80);					
+					//verifica se terminou RSSI
+					do{					
+						read_bbreg6=PHYGetShortRAMAddr(READ_BBREG6);
+					}
+					while((!(read_bbreg6 & 0x01)) && (TPM1_CNT < 3999));
+					// Terminou o calculo do rssi agora resta verificar o valor
+					if (TPM1_CNT < 3999){
+						rssi = PHYGetLongRAMAddr(0x210);
+					}else{
+						rssi = 0;
+					}
+				}while((rssi < 0x60) && (TPM1_CNT < 20000));
+	
+				//desliga o timer
+				TPM1_SC = 0x00;
+				TPM1_CNT = 0;				
+				
+				//verifica o nivel de sinal no canal, se estiver alto(pode haver comunicação)
+				if( rssi >= 0x60){
+					// Reinicia o ponteiro do buffer RX
+					//PHYSetShortRAMAddr(WRITE_RXFLUSH, 0x01);
+					// bypass MRF24J40 errata 5
+					//PHYSetShortRAMAddr(WRITE_FFOEN, 0x98);        
+					//  Enable receiving packets off air
+					//PHYSetShortRAMAddr(WRITE_BBREG1,0x00);
+					PHYSetShortRAMAddr(WRITE_BBREG6, 0x40);
+					releaseRadio();
+					// se rssi foi maior que 20, o radio deve ficar ligado por 10ms para receber até o maior pacote
+					DelayTask(10);
+					SleepRadio();
+				}else{
+					// Senão volta a dormir o rádio
+					PHYSetShortRAMAddr(WRITE_BBREG6, 0x40);
+					SleepRadio();
+					releaseRadio();
+				}
+			
+			}
+		}
+#endif
+		
+		// Descobre o tempo total do processo
+		tick_count = OSGetTickCount(); 
+		
+		if(tick_count < val_anterior){
+			tick_count = (TICK_COUNT_OVERFLOW - val_anterior) + tick_count;
+		}else{
+			tick_count = tick_count - val_anterior;
+		}
+		
+		// Desliga o rádio pelo que falta de tempo para complementar 125ms
+		DelayTask(CONTIKI_MAC_WINDOW - tick_count);
+		tick_count = 0;
+			
+	}//fim do main for
+}//fim do contiki
+#endif
 
 
 

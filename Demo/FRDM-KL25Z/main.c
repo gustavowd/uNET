@@ -76,7 +76,7 @@ int main(void)
 
   ////////////////////////////////////////////////////////
 
-  if(InstallTask(&System_Time,"System Time",384,30, NULL, &TH_SYSTEM) != OK)
+  if(InstallTask(&System_Time,"System Time",384,SystemTaskPriority, NULL, &TH_SYSTEM) != OK)
   {
     // Oh Oh
     // Não deveria entrar aqui !!!

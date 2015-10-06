@@ -652,6 +652,9 @@ INT8U HandleRoutePacket(void)
   INT8U attempts = 0;
   INT8U state = 0;  
   INT8U nwk_state ; /* Variável utilizada na máquina de estados de roteamento */
+#if (CONTIKI_MAC_ENABLE == 1)    
+    INT16U start_time, stop_time;
+#endif  
   
   // Verifica se o destino existe na tabela de vizinhos   
   // Inicia máquina de estados para decodificar pacote e realizar roteamento
@@ -821,10 +824,32 @@ INT8U HandleRoutePacket(void)
       case send_dest_packet:
         // Envia o pacote para o seu destino
         attempts = 0;
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+    	SetRadioStatus(1);
+	    RADIO_WAKE_STATUS_OLD = RADIO_WAKE_STATUS;
+	    // Se o rádio estiver desligado, liga o radio
+	    if( RADIO_WAKE_STATUS == RADIO_SLEEPING){
+		  // Liga o rádio e espera tempo de estabilização
+		  WakeupRadio();
+		  DelayTask(2);
+	    }
+#endif
+#if (CONTIKI_MAC_ENABLE == 1)
+        start_time = OSGetTickCount();
+        stop_time = 0;
+#endif
+        
+        // Tenta rotear o pacote NWK_TX_RETRIES vezes
+#if (CONTIKI_MAC_ENABLE == 1)
+        // Tenta entregar o pacote em pelo menos duas janelas
+        while (stop_time < ((CONTIKI_MAC_WINDOW*2)+10))
+#else
         while (attempts < NWK_TX_RETRIES)
-        {
-          if (attempts < (NWK_TX_RETRIES-1))
-          {
+#endif
+        {        	
+#if (CONTIKI_MAC_ENABLE != 1)          
+          if (attempts < (NWK_TX_RETRIES-1)){
+#endif
         	if ((nwk_packet.NWK_Parameter&NWK_DIRECTION) == NWK_DIRECTION){
         		NWK_Command(unet_neighbourhood[match_count].Addr_16b, DEST_DOWN, (INT8U)(mac_packet.Payload_Size - NWK_OVERHEAD),(INT8U)(nwk_packet.NWK_Packet_Life+1),0);
         	}else{
@@ -846,7 +871,10 @@ INT8U HandleRoutePacket(void)
               {
                 attempts++;
                 // Espera tempo de bursting error
-                DelayTask((INT16U)(RadioRand()*30));
+#if (CONTIKI_MAC_ENABLE != 1) 
+                //DelayTask((INT16U)(RadioRand()*30));
+                DelayTask((INT16U)(RadioRand()+30));
+#endif
               }
             } else
             {              
@@ -861,13 +889,35 @@ INT8U HandleRoutePacket(void)
               //  Enable receiving packets off air
               PHYSetShortRAMAddr(WRITE_BBREG1,0x00);    
             }
-          }else
-          {
+#if (CONTIKI_MAC_ENABLE != 1)            
+			}else
+			{
+				// Se estourou o número de tentativas, desiste de rotear por este nó
+				nwk_state = end_route;
+				state = ROUTE_ATTEMPTS_ERROR;
+				break;
+			}
+#endif          
+#if (CONTIKI_MAC_ENABLE == 1)
+    		// Descobre o tempo total do processo
+    		stop_time = OSGetTickCount();
+
+    		if (stop_time > start_time)
+    		{
+    			stop_time = stop_time - start_time;
+    		}else
+    		{
+    			stop_time = stop_time + (TICK_COUNT_OVERFLOW - start_time);
+			}
+#endif          
+        }
+        
+#if (CONTIKI_MAC_ENABLE == 1)        
+        if (stop_time >= (CONTIKI_MAC_WINDOW+5)){
             nwk_state = end_route;
             state = ROUTE_ATTEMPTS_ERROR;
-            break;
-          }
         }
+#endif        
         
         // Increments Packet Sequence ID
         // Used to identify replicated packets
@@ -875,6 +925,11 @@ INT8U HandleRoutePacket(void)
         if (++SequenceNumber == 0) SequenceNumber = 1;
         UserExitCritical();        
         
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))		        
+        SetRadioStatus(0);
+		// Se no estado anterior o radio estava desligado, desliga o radio agora
+		if( RADIO_WAKE_STATUS_OLD == RADIO_SLEEPING) SleepRadio();
+#endif        
         break;
         
       case call_app_layer:
@@ -909,6 +964,9 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
   INT8U   MinorDepth = 255;
   INT8U   MaxRSSI = 0;
   INT16U  BlackList = 0;
+#if (CONTIKI_MAC_ENABLE == 1)
+  INT16U start_time, stop_time;
+#endif
   
   
   if (NWKPayloadSize > MAX_APP_PAYLOAD_SIZE){   
@@ -1017,12 +1075,35 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
     // Se selecionou um nó para tentativa de roteamento
     if (MinorDepth != 255)
     {      
-      attempts = 0;      
-      // Tenta rotear o pacote 3 vezes
-      while (attempts < NWK_TX_RETRIES)
-      {
-        if (attempts < (NWK_TX_RETRIES-1))
-        {
+      attempts = 0;
+      
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+      	if (!GetRadioStatus()){
+			SetRadioStatus(1);
+			RADIO_WAKE_STATUS_OLD = RADIO_WAKE_STATUS;
+			// Se o rádio estiver desligado, liga o radio
+			if( RADIO_WAKE_STATUS == RADIO_SLEEPING){
+			  // Liga o rádio e espera tempo de estabilização
+			  WakeupRadio();
+			  DelayTask(2);
+			}
+      	}
+#endif
+#if (CONTIKI_MAC_ENABLE == 1)
+        start_time = OSGetTickCount();
+        stop_time = 0;
+#endif
+        
+        // Tenta rotear o pacote NWK_TX_RETRIES vezes
+#if (CONTIKI_MAC_ENABLE == 1)
+        while (stop_time < (CONTIKI_MAC_WINDOW+5))
+#else
+        while (attempts < NWK_TX_RETRIES)
+#endif
+        {        	
+#if (CONTIKI_MAC_ENABLE != 1)          
+          if (attempts < (NWK_TX_RETRIES-1)){
+#endif
           // Envia pacote a ser roteado
           if (RouteInit != START_ROUTE)
           {
@@ -1057,7 +1138,10 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
             {
               attempts++;
               // Espera tempo de bursting error
-              DelayTask((INT16U)(RadioRand()*30));
+#if (CONTIKI_MAC_ENABLE != 1) 
+                //DelayTask((INT16U)(RadioRand()*30));
+              DelayTask((INT16U)(RadioRand()+30));
+#endif
             }
           } else
           {
@@ -1072,17 +1156,39 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
               //  Enable receiving packets off air
               PHYSetShortRAMAddr(WRITE_BBREG1,0x00);
           }
-        }else
-        {
-          // Se estorou o número de tentativas, desiste de rotear por este nó
-          i = ROUTE_NODE_ERROR;
-          BlackList = (INT16U)(BlackList | (1 << selected_node));
-          goto TryAnotherNodeDown;
+#if (CONTIKI_MAC_ENABLE != 1)            
+          }else
+          {
+            // Se estourou o número de tentativas, desiste de rotear por este nó
+            i = ROUTE_NODE_ERROR;
+            BlackList = (INT16U)(BlackList | (1 << selected_node));
+            goto TryAnotherNodeDown;            
+          }
+#endif 
+#if (CONTIKI_MAC_ENABLE == 1)
+    		// Descobre o tempo total do processo
+    		stop_time = OSGetTickCount();
+
+    		if (stop_time > start_time)
+    		{
+    			stop_time = stop_time - start_time;
+    		}else
+    		{
+    			stop_time = stop_time + (TICK_COUNT_OVERFLOW - start_time);
+			}
+#endif    		
         }
-      }            
+#if (CONTIKI_MAC_ENABLE == 1)        
+		if (stop_time >= (CONTIKI_MAC_WINDOW+5)){
+			// Se estourou o número de tentativas, desiste de rotear por este nó
+			i = ROUTE_NODE_ERROR;
+			BlackList = (INT16U)(BlackList | (1 << selected_node));
+			goto TryAnotherNodeDown;
+		}
+#endif        
     }else
     {
-      i = ROUTE_ATTEMPTS_ERROR;
+      i = NO_ROUTE_AVAILABLE;
     }
 
     // Increments Packet Sequence ID
@@ -1090,6 +1196,12 @@ INT8U DownRoute(INT8U RouteInit, INT8U NWKPayloadSize)
     UserEnterCritical();
     if (++SequenceNumber == 0) SequenceNumber = 1;
     UserExitCritical();
+    
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))		        
+    SetRadioStatus(0);
+	// Se no estado anterior o radio estava desligado, desliga o radio agora
+	if( RADIO_WAKE_STATUS_OLD == RADIO_SLEEPING) SleepRadio();
+#endif    
     
     return i;
 }
@@ -1129,7 +1241,8 @@ INT8U UpSimpleRoute(INT8U NWKPayloadSize)
             {
               attempts++;
               // Espera tempo de bursting error
-              DelayTask((INT16U)(RadioRand()*30));              
+              //DelayTask((INT16U)(RadioRand()*30));
+              DelayTask((INT16U)(RadioRand()+30));
             }
           } else
           {
@@ -1198,7 +1311,8 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
             {
               attempts++;
               // Espera tempo de bursting error
-              DelayTask((INT16U)(RadioRand()*30));              
+              //DelayTask((INT16U)(RadioRand()*30));
+              DelayTask((INT16U)(RadioRand()+30));
             }
           } else
           {
@@ -1236,7 +1350,11 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
     INT8U attempts = 0;
     INT8U match_count = 0;
     INT8U semaphore_return = 0;
-
+#if (CONTIKI_MAC_ENABLE == 1)    
+    INT16U start_time, stop_time;
+    volatile int counter1 = 0;
+    volatile int counter2 = 0;
+#endif
 
     if (RouteInit == IN_PROGRESS_ROUTE) 
     {
@@ -1278,11 +1396,33 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
     {
         attempts = 0;
         
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))
+    	SetRadioStatus(1);
+	    RADIO_WAKE_STATUS_OLD = RADIO_WAKE_STATUS;
+	    // Se o rádio estiver desligado, liga o radio
+	    if( RADIO_WAKE_STATUS == RADIO_SLEEPING){
+		  // Liga o rádio e espera tempo de estabilização
+		  WakeupRadio();
+		  DelayTask(2);
+	    }
+#endif
+#if (CONTIKI_MAC_ENABLE == 1)
+        start_time = OSGetTickCount();
+        stop_time = 0;
+        counter1 = 0;
+        counter2 = 0;
+#endif
+        
         // Tenta rotear o pacote NWK_TX_RETRIES vezes
+#if (CONTIKI_MAC_ENABLE == 1)
+        while (stop_time < ((CONTIKI_MAC_WINDOW+5)*2))
+#else
         while (attempts < NWK_TX_RETRIES)
-        {
-          if (attempts < (NWK_TX_RETRIES-1))
-          {
+#endif
+        {        	
+#if (CONTIKI_MAC_ENABLE != 1)          
+          if (attempts < (NWK_TX_RETRIES-1)){
+#endif
             // Envia pacote a ser roteado
             
             // Analisa se é o destino do pacote
@@ -1314,13 +1454,22 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
               }else 
               {
                 attempts++;
+#if (CONTIKI_MAC_ENABLE == 1)                
+                counter1++;
+#endif
                 // Espera tempo de bursting error
-                DelayTask((INT16U)(RadioRand()*30));                              
+#if (CONTIKI_MAC_ENABLE != 1) 
+                //DelayTask((INT16U)(RadioRand()*30));
+                DelayTask((INT16U)(RadioRand()+30));
+#endif
               }
             } else
             {
               // Radio provavelmente travou, efetuar o reset
               attempts++;
+#if (CONTIKI_MAC_ENABLE == 1)              
+              counter2++;
+#endif
 
               //  Disable receiving packets off air
               PHYSetShortRAMAddr(WRITE_BBREG1,0x04);              
@@ -1330,13 +1479,33 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
               //  Enable receiving packets off air
               PHYSetShortRAMAddr(WRITE_BBREG1,0x00);
             }
+#if (CONTIKI_MAC_ENABLE != 1)            
           }else
           {
             // Se estourou o número de tentativas, desiste de rotear por este nó
             j = ROUTE_NODE_ERROR;
             break;
           }
+#endif          
+#if (CONTIKI_MAC_ENABLE == 1)
+    		// Descobre o tempo total do processo
+    		stop_time = OSGetTickCount();
+
+    		if (stop_time >= start_time)
+    		{
+    			stop_time = stop_time - start_time;
+    		}else
+    		{
+    			stop_time = stop_time + (TICK_COUNT_OVERFLOW - start_time);
+			}
+#endif          
         }
+        
+#if (CONTIKI_MAC_ENABLE == 1)        
+        if (stop_time >= (CONTIKI_MAC_WINDOW+5)) j = ROUTE_NODE_ERROR;
+        counter1 = 0;
+        counter2 = 0;
+#endif
         
         // Increments Packet Sequence ID
         // Used to identify replicated packets
@@ -1347,7 +1516,13 @@ INT8U UpBroadcastRoute(INT8U NWKPayloadSize)
     {
       j = NO_ROUTE_AVAILABLE;
     }
-      
+
+#if ((CONTIKI_MAC_ENABLE == 1) && (DEVICE_TYPE != PAN_COORDINATOR))		        
+    SetRadioStatus(0);
+	// Se no estado anterior o radio estava desligado, desliga o radio agora
+	if( RADIO_WAKE_STATUS_OLD == RADIO_SLEEPING) SleepRadio();
+#endif    
+    
     return j;
   }
 #endif
@@ -1414,7 +1589,8 @@ INT8U OneHopRoute(INT8U NWKPayloadSize, INT16U destiny){
             {
               attempts++;
               // Espera tempo de bursting error
-              DelayTask((INT16U)(RadioRand()*30));                
+              //DelayTask((INT16U)(RadioRand()*30));
+              DelayTask((INT16U)(RadioRand()+30));
             }
           } else
           {

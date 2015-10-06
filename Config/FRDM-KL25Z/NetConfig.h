@@ -6,6 +6,9 @@
 /// Define network support           
 #define NETWORK_ENABLE                      1
 
+#define CONTIKI_MAC_ENABLE					0
+#define CONTIKI_MAC_WINDOW					125
+
 // Network device types
 #define   PAN_COORDINATOR                   0
 #define   ROUTER                            1
@@ -22,10 +25,10 @@
 
 #define ROUTER_AUTO_ASSOCIATION				TRUE
 #if (ROUTER_AUTO_ASSOCIATION == TRUE)
-#if (ROUTER == ROUTER1)
+#if (ROUTER_TYPE == ROUTER1)
 #define ROUTER_AUTO_ASSOCIATION_MAC_ADDR	1
 #endif
-#if (ROUTER == ROUTER2)
+#if (ROUTER_TYPE == ROUTER2)
 #define ROUTER_AUTO_ASSOCIATION_MAC_ADDR	2
 #endif
 #endif
@@ -43,14 +46,16 @@
 #define REACTIVE_UP_ROUTE_AUTO_MAINTENANCE  1
 
 // UNET Tasks Priorities
-#define RF_EventHandlerPriority     (INT8U)31
-#define Timer_Priority     			(INT8U)29
+#define ContikiMACPriority			(INT8U)31
+#define SystemTaskPriority     		(INT8U)30
+#define RF_EventHandlerPriority     (INT8U)29
+#define Timer_Priority     			(INT8U)28
 #define UNET_Mutex_Priority         (INT8U)27
-#define MAC_HandlerPriority         (INT8U)22
-#define NWK_HandlerPriority         (INT8U)23
-#define APP1_Priority               (INT8U)24
+#define APP1_Priority               (INT8U)26
 #define APP2_Priority               (INT8U)25
-#define APP3_Priority               (INT8U)26
+#define APP3_Priority               (INT8U)24
+#define NWK_HandlerPriority         (INT8U)23
+#define MAC_HandlerPriority         (INT8U)22
 
 
 // APPs signals 
@@ -63,22 +68,36 @@
 #define UNET_MAC_StackSize         (384)
 #define UNET_NWK_StackSize         (1280)
 #else
+#define ContikiMAC_StackSize       (384)
 #define UNET_RF_Event_StackSize    (256)
 #define UNET_MAC_StackSize         (384)
 #define UNET_NWK_StackSize         (1088)
 #endif
 
 // Ping Times
+#if (CONTIKI_MAC_ENABLE == 1)
+#define TX_TIMEOUT       20
+#else
 #define TX_TIMEOUT       50
+#endif
 #define PING_TIME		 10
 #define MAX_PING_TIME	  8
+
+#if (CONTIKI_MAC_ENABLE == 1)
+#define PING_RETRIES	 70	  
+#else
 #define PING_RETRIES	  3
+#endif
 
 // UpRoute Times
 #define MAX_UPROUTE_MAINTENANCE_TIME	30
 
 /// RF Buffer Size
+#if (DEVICE_TYPE == PAN_COORDINATOR)
+#define RFBufferSize      (INT16U)5*1024      // max. 6 packets (128B)
+#else
 #define RFBufferSize      (INT16U)768      // max. 6 packets (128B)
+#endif
 
 /// Memory locations for network address and configurations
 #if PROCESSOR == COLDFIRE_V1

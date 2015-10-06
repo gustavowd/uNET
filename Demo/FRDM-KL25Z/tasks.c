@@ -105,9 +105,17 @@ void pisca_led_net(void *param)
 	{
 		// Envia mensagem para o coordenador
 		NetGeneralONOFF(TRUE, 0);
+#if (CONTIKI_MAC_ENABLE == 1)
+		DelayTask(3010);
+#else
 		DelayTask(1000);
+#endif
 		NetGeneralONOFF(FALSE, 0);
+#if (CONTIKI_MAC_ENABLE == 1)
+		DelayTask(3010);
+#else
 		DelayTask(1000);
+#endif
 	}
 }
 #endif
@@ -145,11 +153,24 @@ void pisca_led_net(void *param)
 			{
 				neighbor = unet_neighbourhood[i].Addr_16b;
 				NetGeneralONOFF(TRUE, neighbor);
+#if (CONTIKI_MAC_ENABLE == 1)
+				DelayTask(2000);
+#else
 				DelayTask(1000);
+#endif
 				NetGeneralONOFF(FALSE, neighbor);
+#if (CONTIKI_MAC_ENABLE == 1)
+				DelayTask(2000);
+#else
+				DelayTask(1000);
+#endif				
 			}
-			DelayTask(100);
 		}
+#if (CONTIKI_MAC_ENABLE == 1)
+		DelayTask(2000);
+#else
+		DelayTask(1000);
+#endif		
 	}
 }
 #endif
