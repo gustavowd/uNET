@@ -252,11 +252,11 @@ INT8U VerifyPacketReplicated(void)
           {
             unet_neighbourhood[i].NeighborLastID = mac_packet.Sequence_Number;
             unet_neighbourhood[i].IDTimeout      = LAST_ID_SYSTEM_TIMER_TIMEOUT;
-            return OK;
+            return FALSE;
           }
         }
     }
-    return OK;
+    return FALSE;
 }
 
 
@@ -675,6 +675,7 @@ INT8U HandleRoutePacket(void)
         {
 
           #if (USE_REACTIVE_UP_ROUTE == 1)
+        	// Se for mensagem DOWN, entra aqui, independente de ser destino ou não
         	if ((nwk_packet.NWK_Parameter&NWK_DIRECTION) == NOT_DEST_DOWN){
 				// ********************************************************************************
 				// Guarda a informação de rota do nó que passou por este roteador no sentido para o roteador (down)
